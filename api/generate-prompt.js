@@ -5,29 +5,34 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // Ensure API key is set as an environment variable in Vercel
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ message: 'API key not configured.' });
   }
 
-  const { userPrompt, generationConfig, responseSchema } = req.body;
+  // Destructure userPrompt and generationConfig from req.body
+  const { userPrompt, generationConfig } = req.body; // <-- MODIFIED THIS LINE
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const requestPayload = {
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: generationConfig // Pass generationConfig from frontend
+      // Build contents array correctly from the userPrompt
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }], // <-- MODIFIED THIS LINE
+      generationConfig: generationConfig
     };
 
     // Conditionally add responseMimeType and responseSchema if provided
-    if (responseSchema && Object.keys(responseSchema).length > 0) {
-        requestPayload.generationConfig.responseMimeType = "application/json";
-        requestPayload.generationConfig.responseSchema = responseSchema;
+    // This part needs to be careful because generationConfig might be empty from generatePrompt
+    if (generationConfig && generationConfig.responseMimeType && generationConfig.responseSchema) {
+        requestPayload.generationConfig.responseMimeType = generationConfig.responseMimeType;
+        requestPayload.generationConfig.responseSchema = generationConfig.responseSchema;
+    } else if (generationConfig) { // Ensure generationConfig is not undefined
+         requestPayload.generationConfig = generationConfig;
+    } else {
+         requestPayload.generationConfig = {}; // Default to empty if not provided
     }
-
 
     const result = await model.generateContent(requestPayload);
     const response = await result.response;

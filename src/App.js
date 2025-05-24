@@ -190,7 +190,7 @@ const App = () => {
     `.trim();
 
     const payload = {
-      contents: [{ role: "user", parts: [{ text: ideaPrompt }] }],
+      userPrompt: ideaPrompt, // Send the prompt text directly
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -205,10 +205,9 @@ const App = () => {
           },
           "propertyOrdering": ["persona", "task", "context", "examples", "format", "constraints"]
         }
-      },
-      // Removed the redundant responseSchema here, as it's part of generationConfig
+      }
+      // Remove the redundant 'responseSchema' outside of generationConfig
     };
-
     // Removed the API key and apiUrl as they are handled by the Vercel function
     try {
       const response = await fetch('/api/generate-prompt', { // Call the Vercel API route
