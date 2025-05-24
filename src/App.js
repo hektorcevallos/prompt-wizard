@@ -80,8 +80,7 @@ const App = () => {
     setError('');
     setGeneratedPrompt('');
 
-    // Construct the prompt for the LLM based on user inputs
-    const userPrompt = `
+    const userPromptToSend = `
       You are an expert prompt engineer. Your task is to create a highly effective and well-structured prompt for a large language model, following best practices.
       Consider the following elements provided by the user:
 
@@ -98,33 +97,29 @@ const App = () => {
       Do not include any conversational text outside of the prompt itself.
     `.trim();
 
+    // NEW: Call your Vercel API route
     try {
-      // LLM API call
-      let chatHistory = [];
-      chatHistory.push({ role: "user", parts: [{ text: userPrompt }] });
-      const payload = { contents: chatHistory };
-      const apiKey = ""; // Canvas will provide this if empty
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          userPrompt: userPromptToSend,
+          generationConfig: {}, // No specific generationConfig for this general prompt
+          responseSchema: {} // No specific responseSchema for this general prompt
+        })
       });
 
       const result = await response.json();
 
-      if (result.candidates && result.candidates.length > 0 &&
-          result.candidates[0].content && result.candidates[0].content.parts &&
-          result.candidates[0].content.parts.length > 0) {
-        setGeneratedPrompt(result.candidates[0].content.parts[0].text);
+      if (response.ok) { // Check if the response status is successful (2xx)
+        setGeneratedPrompt(result.generatedText);
       } else {
-        setError('Failed to generate prompt. Please try again.');
-        console.error('LLM response structure unexpected:', result);
+        setError(result.message || 'Failed to generate prompt from LLM.');
+        console.error('API Error:', result.error || result.message);
       }
     } catch (err) {
-      setError('An error occurred while generating the prompt. Please check your network connection and try again.');
-      console.error('Error during LLM API call:', err);
+      setError('An error occurred while calling the LLM API. Please check your network connection.');
+      console.error('Frontend Fetch Error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -210,14 +205,13 @@ const App = () => {
           },
           "propertyOrdering": ["persona", "task", "context", "examples", "format", "constraints"]
         }
-      }
+      },
+      // Removed the redundant responseSchema here, as it's part of generationConfig
     };
 
-    const apiKey = ""; // Canvas will provide this if empty
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
+    // Removed the API key and apiUrl as they are handled by the Vercel function
     try {
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/generate-prompt', { // Call the Vercel API route
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -225,12 +219,8 @@ const App = () => {
 
       const result = await response.json();
 
-      if (result.candidates && result.candidates.length > 0 &&
-          result.candidates[0].content && result.candidates[0].content.parts &&
-          result.candidates[0].content.parts.length > 0) {
-        const json = result.candidates[0].content.parts[0].text;
-        const parsedJson = JSON.parse(json);
-
+      if (response.ok) { // Check if the response status is successful (2xx)
+        const parsedJson = JSON.parse(result.generatedText); // The generatedText from server is a JSON string
         setPersona(parsedJson.persona || '');
         setTask(parsedJson.task || '');
         setContext(parsedJson.context || '');
@@ -238,12 +228,12 @@ const App = () => {
         setFormat(parsedJson.format || '');
         setConstraints(parsedJson.constraints || '');
       } else {
-        setIdeaError('Failed to parse idea into sections. Please try a different idea or fill manually.');
-        console.error('LLM response structure unexpected for idea parsing:', result);
+        setIdeaError(result.message || 'Failed to parse idea into sections. Please try a different idea or fill manually.');
+        console.error('API Error:', result.error || result.message);
       }
     } catch (err) {
-      setIdeaError('An error occurred while processing your idea. Please try again.');
-      console.error('Error during LLM API call for idea parsing:', err);
+      setIdeaError('An error occurred while calling the LLM API. Please try again.');
+      console.error('Frontend Fetch Error:', err);
     } finally {
       setIsPopulatingFromIdea(false);
     }
@@ -436,7 +426,7 @@ const App = () => {
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                  </svg>
                 Generating...
               </>
             ) : (
